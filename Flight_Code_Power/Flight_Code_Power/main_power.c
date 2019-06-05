@@ -18,6 +18,8 @@
 /* Global variables */
 TWI_Master_t twiMaster;           /*!< TWI master module. */
 USART_data_t USART_datac0;
+USART_data_t USART_datac1;
+USART_data_t USART_dataf0;
 uint8_t usartc0_receive=0x01;
 uint8_t op_mode=PREFLIGHT_MODE;       //next state of oprational mode
 uint8_t pre_op_mode=PREFLIGHT_MODE;  //previous state of operation mode
@@ -47,7 +49,11 @@ int main(void)
 {   
 	//POWER_SAVE_ENABLE();
 	EXTERNAL_INT_PINDO();
-	USART_ENABLE_C();
+	//USART_ENABLE_C();
+	USART0_INIT(&PORTC,USART_datac0, USARTC0);            //for usart connected to preflight
+	USART1_INIT(&PORTC,USART_datac1, USARTC1);            //for usart connected to OBC
+	USART0_INIT(&PORTF,USART_dataf0, USARTF0);			  //for usart connected to comm board
+	
 	/* Initialize TWI master. */
 	TWI_MasterInit(&twiMaster,
 	&TWIC,
@@ -76,7 +82,7 @@ int main(void)
 	if (SNAP!=0x43)
 	{
 		set_sleep_mode(SLEEP_MODE_PWR_DOWN);
-		POWER_SAVE_ENABLE();
+		POWER_SAVE_CLK_ENABLE();
 		sleep_mode();
 	}
 	
@@ -159,43 +165,123 @@ int main(void)
 			
 			if(op_mode==pre_op_mode)                    
 			{
-				PORTF_OUT=0xF0;
+				
 				pre_op_mode=op_mode;
 				USART_TXBuffer_PutByte(&USART_datac0,'X');
-				_delay_ms(100);
-				PORTF_OUT=0x0F;
+				_delay_ms(10);
+				
 			}
 			else
 			{
-				pre_op_mode=op_mode;
+				
 				switch(op_mode)
 				{
-					case PREFLIGHT_MODE: USART_TXBuffer_PutByte(&USART_datac0,'A'); PORTF_OUT=0x0F;
+					case PREFLIGHT_MODE: USART_TXBuffer_PutByte(&USART_datac0,'A');
 					break;
-					case LAUNCH_MODE:    USART_TXBuffer_PutByte(&USART_datac0,'B');
+					case LAUNCH_MODE:   //op_mode=DETUMB_PRE_MODE; 
+										USART_TXBuffer_PutByte(&USART_datac0,'B');
 					break;
+					
 					case DETUMB_PRE_MODE:USART_TXBuffer_PutByte(&USART_datac0,'C');
 					break;
+					
 					case DETUMB_POST_MODE:USART_TXBuffer_PutByte(&USART_datac0,'D');
 					break;
-					case NOM_IDLE_MODE: USART_TXBuffer_PutByte(&USART_datac0,'E');
+					
+					case NOM_IDLE_MODE: 
+							if (pre_op_mode==EXTREME_LOW_POWER_MODE)
+							{
+								PORTE.OUTSET=0x55;
+								PORTF.OUTSET=0xE2;
+								PORTD.OUTSET=0x40;
+								PORTC.OUTSET=0x18;
+							}
+							else if (pre_op_mode==LOW_POWER_MODE)
+							{
+								PORTE.OUTSET=0x55;
+								PORTF.OUTSET=0xE2;
+							}
+							USART_TXBuffer_PutByte(&USART_datac0,'E');
 					break;
-					case NOM_TRANSMIT_MODE:USART_TXBuffer_PutByte(&USART_datac0,'F');
+					
+					case NOM_TRANSMIT_MODE:
+							if (pre_op_mode==EXTREME_LOW_POWER_MODE)
+							{
+								PORTE.OUTSET=0x55;
+								PORTF.OUTSET=0xE2;
+								PORTD.OUTSET=0x40;
+								PORTC.OUTSET=0x18;
+							}
+							else if (pre_op_mode==LOW_POWER_MODE)
+							{
+								PORTE.OUTSET=0x55;
+								PORTF.OUTSET=0xE2;
+							}
+							USART_TXBuffer_PutByte(&USART_datac0,'F');
 					break;
-					case NOM_UPLINK_MODE:USART_TXBuffer_PutByte(&USART_datac0,'G');
+					
+					case NOM_UPLINK_MODE:
+							if (pre_op_mode==EXTREME_LOW_POWER_MODE)
+							{
+								PORTE.OUTSET=0x55;
+								PORTF.OUTSET=0xE2;
+								PORTD.OUTSET=0x40;
+								PORTC.OUTSET=0x18;
+							}
+							else if (pre_op_mode==LOW_POWER_MODE)
+							{
+								PORTE.OUTSET=0x55;
+								PORTF.OUTSET=0xE2;
+							}
+							USART_TXBuffer_PutByte(&USART_datac0,'G');
 					break;
-					case LOW_POWER_MODE:USART_TXBuffer_PutByte(&USART_datac0,'H');
+					
+					case LOW_POWER_MODE:
+							PORTE.OUTCLR=0x55;
+							PORTF.OUTCLR=0xE2;
+							USART_TXBuffer_PutByte(&USART_datac0,'H');     //
 					break;
-					case EXTREME_LOW_POWER_MODE:USART_TXBuffer_PutByte(&USART_datac0,'I');
+					
+					case EXTREME_LOW_POWER_MODE:
+							// Switch off all the components
+							PORTE.OUTCLR=0x55;
+							PORTF.OUTCLR=0xE2;
+							PORTD.OUTCLR=0x40;
+							PORTC.OUTCLR=0x18;						
+							USART_TXBuffer_PutByte(&USART_datac0,'I');
 					break;
 					case EMERGENCY_MODE: USART_TXBuffer_PutByte(&USART_datac0,'P');
 					break;
-					case RESTART_MODE:USART_TXBuffer_PutByte(&USART_datac0,'J');
+					
+					case RESTART_MODE:
+							// Switch off all the components
+							PORTE.OUTCLR=0x55;
+							PORTF.OUTCLR=0xE2;
+							PORTD.OUTCLR=0x40;
+							PORTC.OUTCLR=0x18;
+							// Switch off for some time
+							_delay_ms(10);
+							// Power on all
+							PORTE.OUTSET=0x55;
+							PORTF.OUTSET=0xE2;
+							PORTD.OUTSET=0x40;
+							PORTC.OUTSET=0x18;
+							USART_TXBuffer_PutByte(&USART_datac0,'J');
 					break;
-					case KILL_MODE:USART_TXBuffer_PutByte(&USART_datac0,'K');
+					
+					case KILL_MODE:
+							// Switch off all the components
+							PORTE.OUTCLR=0x55;
+							PORTF.OUTCLR=0xE2;
+							PORTD.OUTCLR=0x40;
+							PORTC.OUTCLR=0x18;
+							while(1);           
+							USART_TXBuffer_PutByte(&USART_datac0,'K');
 					break;
+					
 				}
-
+				
+				pre_op_mode=op_mode; //update previous operation mode
 			}
 			
 			
@@ -232,7 +318,7 @@ int main(void)
 
 		
 		UART_TXBuffer_PutByte(&USART_datac0, Battery_volatge);
-		_delay_ms(500) ;
+		_delay_ms(100) ;
 		TWI_MasterWriteRead(&twiMaster,                                      //added by me
 		EEPROM_ADDRESS,
 		&SendBuffer[0],
@@ -254,7 +340,7 @@ int main(void)
 
 ISR(PORTD_INT0_vect)
 {
-	POWER_SAVE_DISABLE();
+	POWER_SAVE_CLK_DISABLE();
 	_delay_ms(100);
 	UART_TXBuffer_PutByte(&USART_datac0, 'Z');
 	TWI_MasterWriteRead(&twiMaster,                                      //added by me
